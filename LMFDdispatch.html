@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fire Command | CAD Interface v12</title>
+    <style>
+        :root {
+            --bg-dark: #1a1a1a;
+            --panel-bg: #2d2d2d;
+            --text-light: #e0e0e0;
+            --accent-red: #d32f2f;
+            --accent-blue: #1976d2;
+            --accent-green: #388e3c;
+            --accent-orange: #f57c00;
+            --status-responding: #ff9800;
+            --border: #404040;
+            
+            --prio-1: #d32f2f;
+            --prio-2: #f57c00;
+            --prio-3: #1976d2;
+
+            /* Status Colors */
+            --st-avail: #2e7d32;
+            --st-resp: #f57c00;
+            --st-scene: #d32f2f;
+            --st-oos: #424242;
+            --st-train: #7b1fa2;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1, h2, h3 { margin-top: 0; }
+        
+        header {
+            border-bottom: 2px solid var(--accent-red);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Layout Grid */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        /* Forms */
+        .input-group { margin-bottom: 10px; }
+        label { display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 4px; }
+        
+        input[type="text"], select {
+            width: 100%;
+            padding: 8px;
+            background: #404040;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        textarea.call-notes {
+            width: 100%;
+            background: #222;
+            border: 1px solid #444;
+            color: #ccc;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 10px;
+            resize: vertical;
+            min-height: 60px;
+            font-family: inherit;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+        }
+        textarea.call-notes:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        button {
+            cursor: pointer;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            color: white;
+            transition: all 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+
+        .btn-add { background-color: var(--accent-blue); width: 100%; }
+        .btn-update { background-color: var(--accent-orange); width: 100%; }
+        .btn-create { background-color: var(--accent-red); width: 100%; }
+        .btn-cancel { background-color: #555; width: 100%; margin-top: 5px; }
+
+        /* Unit Card Styles */
+        .unit-list, .call-list { list-style: none; padding: 0; }
+
+        .unit-card {
+            background: #383838;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            border-left: 5px solid var(--st-avail);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        /* Dynamic Status Border Colors */
+        .unit-card[data-status="Available"] { border-left-color: var(--st-avail); }
+        .unit-card[data-status="Responding"] { border-left-color: var(--st-resp); }
+        .unit-card[data-status="On Scene"] { border-left-color: var(--st-scene); }
+        .unit-card[data-status="Out of Service"] { border-left-color: var(--st-oos); opacity: 0.7; }
+        .unit-card[data-status="Training"] { border-left-color: var(--st-train); }
+        
+        .unit-card.editing { border: 2px solid var(--accent-orange); background: #3e3528; }
+
+        .unit-info { display: flex; flex-direction: column; width: 55%; }
+        .unit-name-sub { font-size: 0.75rem; color: #888; margin-top: 2px; }
+        .unit-station-tag { color: #aaa; font-weight: bold; margin-right: 5px;}
+        
+        /* Status Dropdown in Unit Card */
+        .status-select {
+            padding: 2px 5px;
+            font-size: 0.75rem;
+            background: #222;
+            color: #fff;
+            border: 1px solid #555;
+            margin-top: 4px;
+            width: 100%;
+        }
+
+        .unit-actions { display: flex; gap: 2px; margin-left: 5px; }
+        
+        .btn-icon {
+            background-color: #444;
+            border: 1px solid #555;
+            color: #ccc;
+            padding: 4px 6px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            min-width: 24px;
+        }
+        .btn-icon:hover { background-color: #666; color: white; }
+        .btn-delete:hover { background-color: var(--accent-red); border-color: var(--accent-red); }
+        .btn-edit:hover { background-color: var(--accent-orange); border-color: var(--accent-orange); }
+
+        /* Call Card Styles */
+        .call-card {
+            background: #383838;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-top: 4px solid #555;
+        }
+
+        .call-card.prio-1 { border-top-color: var(--prio-1); }
+        .call-card.prio-2 { border-top-color: var(--prio-2); }
+        .call-card.prio-3 { border-top-color: var(--prio-3); }
+
+        .call-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
+        }
+
+        .assigned-units-container { 
+            background: #222; 
+            padding: 10px; 
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .unit-status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+        }
+        .unit-status-row:last-child { border-bottom: none; }
+
+        .btn-arrive {
+            background-color: var(--status-responding);
+            color: black;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+        }
+        .btn-unassign {
+            background: transparent;
+            border: 1px solid #555;
+            color: #888;
+            cursor: pointer;
+            margin-left: 8px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            line-height: 1;
+        }
+        .btn-unassign:hover { background: var(--accent-red); color: white; border-color: var(--accent-red); }
+
+        .badge-scene { background-color: var(--accent-red); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+        .badge-resp { color: var(--status-responding); font-weight: bold; font-size: 0.8rem; margin-right: 10px; }
+        
+        .badge-prio {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        .badge-prio-1 { background: var(--prio-1); color: white; }
+        .badge-prio-2 { background: var(--prio-2); color: white; }
+        .badge-prio-3 { background: var(--prio-3); color: white; }
+
+        .meta-info {
+            font-size: 0.85rem;
+            color: #aaa;
+            display: flex;
+            gap: 15px;
+            margin-bottom: 5px;
+        }
+        .meta-label { color: #777; margin-right: 3px; }
+
+        /* Enhanced Address Visibility */
+        .call-details {
+            font-size: 1.3rem; /* Larger Font */
+            font-weight: bold;
+            color: white;
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px dashed #444;
+        }
+
+        /* Scene Command Control */
+        .command-control {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            background: #2c2c2c;
+            padding: 5px;
+            border: 1px solid #444;
+            border-radius: 4px;
+        }
+        .command-select {
+            background: #222;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 4px;
+            margin-left: 10px;
+            flex-grow: 1;
+            font-size: 0.85rem;
+        }
+
+        /* Multi-Select Dispatch Area */
+        .dispatch-area {
+            margin-top: 15px;
+            border-top: 1px solid #555;
+            padding-top: 10px;
+        }
+
+        .dispatch-toggle-btn {
+            background-color: #444;
+            width: 100%;
+            text-align: left;
+            padding: 8px;
+            font-size: 0.9rem;
+        }
+
+        .dispatch-menu {
+            background: #2a2a2a;
+            border: 1px solid #555;
+            padding: 10px;
+            margin-top: 5px;
+            display: none;
+        }
+        .dispatch-menu.open { display: block; }
+
+        .unit-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .unit-checkbox-label {
+            background: #404040;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            border: 1px solid transparent;
+        }
+        .unit-checkbox-label:hover { background: #505050; }
+        .unit-checkbox-label:has(input:checked) {
+            border-color: var(--accent-green);
+            background: #2e3d2e;
+        }
+
+        .dispatch-actions { display: flex; gap: 10px; }
+        .btn-send-units { background-color: var(--accent-green); flex: 1; }
+        .btn-clear-call { background-color: #555; padding: 5px 10px; }
+
+        .tag { background: #555; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 5px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🔥 FD Dispatch Interface</h1>
+        <div id="clock">00:00:00</div>
+    </header>
+
+    <div class="main-container">
+        <!-- LEFT COLUMN: Fleet -->
+        <div class="sidebar">
+            <div class="panel">
+                <h3 id="formTitle">1. Fleet Management</h3>
+                
+                <div class="form-row">
+                    <div class="input-group" style="flex: 1;">
+                        <label>Callsign (ID)</label>
+                        <input type="text" id="unitId" placeholder="E.g. E-101">
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                        <label>Station</label>
+                        <input type="text" id="unitStation" placeholder="E.g. Stn 1">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Vehicle Name</label>
+                    <input type="text" id="unitName" placeholder="E.g. 'Big Red'">
+                </div>
+                
+                <div class="input-group">
+                    <label>Type</label>
+                    <select id="unitType">
+                        <option value="Engine">Engine</option>
+                        <option value="Ladder">Ladder/Truck</option>
+                        <option value="Medic">Medic/Ambulance</option>
+                        <option value="Chief">Chief/Battalion</option>
+                        <option value="Rescue">Rescue/Squad</option>
+                    </select>
+                </div>
+                <button id="btnSaveUnit" class="btn-add" onclick="handleUnitForm()">Add Unit</button>
+                <button id="btnCancelEdit" class="btn-cancel" onclick="cancelEdit()" style="display:none;">Cancel Edit</button>
+            </div>
+
+            <div class="panel" style="flex-grow: 1;">
+                <h3>Unit Status</h3>
+                <ul id="unitList" class="unit-list"></ul>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: CAD -->
+        <div class="sidebar">
+            <div class="panel">
+                <h3>2. Create Call</h3>
+                
+                <!-- Row 1: Location -->
+                <div class="form-row">
+                    <div class="input-group" style="flex: 2;">
+                        <label>Address</label>
+                        <input type="text" id="callAddress" placeholder="123 Main St">
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                        <label>Postal Code</label>
+                        <input type="text" id="callPostal" placeholder="Zip">
+                    </div>
+                </div>
+
+                <!-- Row 2: Details -->
+                <div class="form-row">
+                    <div class="input-group" style="flex: 2;">
+                        <label>Type</label>
+                        <select id="callType">
+                            <option value="Medical">Medical</option>
+                            <option value="Structure Fire">Structure Fire</option>
+                            <option value="Brush Fire">Brush Fire</option>
+                            <option value="Dumpster Fire">Dumpster Fire</option>
+                            <option value="Motor Vehicle Accident">Motor Vehicle Accident</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Row 3: Meta -->
+                <div class="form-row">
+                    <div class="input-group" style="flex: 1;">
+                        <label>Priority</label>
+                        <select id="callPriority">
+                            <option value="1">1 - No ELS</option>
+                            <option value="2" selected>2 - Only ELS</option>
+                            <option value="3">3 - ELS & Sirens</option>
+                        </select>
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                        <label>Origin</label>
+                        <select id="callOrigin">
+                            <option value="911">911 Call</option>
+                            <option value="Auotomated Alrm">Alarm Co.</option>
+                            <option value="Radio">Radio</option>
+                            <option value="Walk-In">Station Walk-In</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn-create" onclick="createCall()">Generate Call</button>
+            </div>
+
+            <div class="panel" style="flex-grow: 1;">
+                <h3>3. Active Dispatch Board</h3>
+                <div id="activeCalls"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        let units = [];
+        let calls = [];
+        let callIdCounter = 1000;
+        let editingUnitOriginalId = null;
+
+        window.onload = function() {
+            // --- DEFAULT UNITS ---
+            units.push({ id: "ENG-12", name: "Insert Assigned Unit", type: "Engine", status: "Available", station: "STN-1" });
+            units.push({ id: "ENG-24", name: "Insert Assigned Unit", type: "Engine", status: "Available", station: "STN-2" });
+            units.push({ id: "TWR-15", name: "Insert Assigned Unit", type: "Ladder", status: "Available", station: "STN-1" });
+            units.push({ id: "LAD-18", name: "Insert Assigned Unit", type: "Ladder", status: "Available", station: "STN-2" });
+            units.push({ id: "RES-8", name: "Insert Assigned Unit", type: "Engine", status: "Available", station: "STN-1" });
+            units.push({ id: "RES-14", name: "Insert Assigned Unit", type: "Engine", status: "Available", station: "STN-1" });
+            units.push({ id: "TNK-13", name: "Insert Assigned Unit", type: "Engine", status: "Available", station: "STN-1" });
+            units.push({ id: "TNK-25", name: "Insert Assigned Unit", type: "Engine", status: "Available", station: "STN-2" });
+            units.push({ id: "BRS-1", name: "Insert Assigned Unit", type: "Engine", status: "Available", station: "STN-2" });
+            units.push({ id: "MED-10", name: "Insert Assigned Unit", type: "Medic", status: "Available", station: "STN-1" });
+            units.push({ id: "MED-20", name: "Insert Assigned Unit", type: "Medic", status: "Available", station: "STN-2" });
+            units.push({ id: "CAR-X", name: "Insert Assigned Unit", type: "Chief", status: "Available", station: "STN-1" });
+            
+            renderUnits();
+            startTime();
+        };
+
+        function startTime() {
+            const today = new Date();
+            let h = today.getHours(); let m = today.getMinutes(); let s = today.getSeconds();
+            m = m < 10 ? "0" + m : m; s = s < 10 ? "0" + s : s;
+            document.getElementById('clock').innerHTML = h + ":" + m + ":" + s;
+            setTimeout(startTime, 1000);
+        }
+
+        // --- UNIT LOGIC ---
+        function handleUnitForm() {
+            const id = document.getElementById('unitId').value.toUpperCase();
+            const station = document.getElementById('unitStation').value;
+            const name = document.getElementById('unitName').value;
+            const type = document.getElementById('unitType').value;
+            
+            if (!id) return alert("Enter Callsign/ID");
+
+            if (editingUnitOriginalId === null) {
+                if (units.find(u => u.id === id)) return alert("Callsign Exists");
+                units.push({ id: id, name: name, station: station, type: type, status: "Available" });
+            } else {
+                if (id !== editingUnitOriginalId && units.find(u => u.id === id)) return alert("Callsign Taken");
+                const unit = units.find(u => u.id === editingUnitOriginalId);
+                if (unit) {
+                    unit.id = id; 
+                    unit.name = name;
+                    unit.station = station;
+                    unit.type = type;
+                    // Update ID in active calls
+                    calls.forEach(c => {
+                        c.assignedUnits.forEach(au => {
+                            if(au.id === editingUnitOriginalId) au.id = id;
+                        });
+                        if(c.command === editingUnitOriginalId) c.command = id;
+                    });
+                }
+                cancelEdit();
+            }
+            document.getElementById('unitId').value = "";
+            document.getElementById('unitName').value = "";
+            document.getElementById('unitStation').value = "";
+            renderUnits(); renderCalls();
+        }
+
+        function startEdit(uid) {
+            const unit = units.find(u => u.id === uid);
+            if (!unit) return;
+            document.getElementById('unitId').value = unit.id;
+            document.getElementById('unitName').value = unit.name || "";
+            document.getElementById('unitStation').value = unit.station || "";
+            document.getElementById('unitType').value = unit.type;
+            editingUnitOriginalId = uid;
+            document.getElementById('formTitle').innerText = "Editing: " + uid;
+            document.getElementById('btnSaveUnit').innerText = "Update";
+            document.getElementById('btnSaveUnit').className = "btn-update";
+            document.getElementById('btnCancelEdit').style.display = 'block';
+            renderUnits();
+        }
+
+        function cancelEdit() {
+            editingUnitOriginalId = null;
+            document.getElementById('unitId').value = "";
+            document.getElementById('unitName').value = "";
+            document.getElementById('unitStation').value = "";
+            document.getElementById('formTitle').innerText = "1. Fleet Management";
+            document.getElementById('btnSaveUnit').innerText = "Add Unit";
+            document.getElementById('btnSaveUnit').className = "btn-add";
+            document.getElementById('btnCancelEdit').style.display = 'none';
+            renderUnits();
+        }
+
+        function deleteUnit(uid) {
+            if(editingUnitOriginalId) return alert("Finish editing first.");
+            const idx = units.findIndex(u => u.id === uid);
+            if (units[idx].status !== "Available") return alert("Unit assigned. Clear call first.");
+            if(confirm("Delete " + uid + "?")) {
+                units.splice(idx, 1);
+                renderUnits(); renderCalls();
+            }
+        }
+
+        function moveUnit(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= units.length) return;
+            [units[index], units[newIndex]] = [units[newIndex], units[index]];
+            renderUnits();
+        }
+
+        function setManualStatus(unitId, newStatus) {
+            const unit = units.find(u => u.id === unitId);
+            if (!unit) return;
+
+            // If unit is set to Available, Out of Service, or Training, remove from active calls
+            if (newStatus === "Available" || newStatus === "Out of Service" || newStatus === "Training") {
+                calls.forEach(c => {
+                    const idx = c.assignedUnits.findIndex(u => u.id === unitId);
+                    if (idx !== -1) {
+                        c.assignedUnits.splice(idx, 1);
+                        if(c.command === unitId) c.command = null;
+                    }
+                });
+            }
+
+            unit.status = newStatus;
+            renderUnits();
+            renderCalls();
+        }
+
+        // --- CALL LOGIC ---
+
+        function createCall() {
+            const addr = document.getElementById('callAddress').value;
+            const postal = document.getElementById('callPostal').value;
+            const type = document.getElementById('callType').value;
+            const prio = document.getElementById('callPriority').value;
+            const origin = document.getElementById('callOrigin').value;
+
+            if (!addr) return alert("Enter Address");
+            
+            calls.push({
+                id: callIdCounter++,
+                address: addr,
+                postal: postal || "N/A",
+                type: type,
+                priority: prio,
+                origin: origin,
+                timestamp: new Date().toLocaleTimeString(),
+                notes: "", 
+                assignedUnits: [],
+                command: null 
+            });
+            
+            document.getElementById('callAddress').value = ""; 
+            document.getElementById('callPostal').value = ""; 
+            
+            renderCalls();
+        }
+
+        function updateCallNotes(callId, value) {
+            const call = calls.find(c => c.id === callId);
+            if (call) call.notes = value;
+        }
+
+        function setSceneCommand(callId, unitId) {
+            const call = calls.find(c => c.id === callId);
+            if(call) {
+                call.command = unitId === "none" ? null : unitId;
+            }
+        }
+
+        function toggleDispatchMenu(callId) {
+            const menu = document.getElementById(`dispatch-menu-${callId}`);
+            menu.style.display = (menu.style.display === "block") ? "none" : "block";
+        }
+
+        function dispatchSelected(callId) {
+            const checkboxes = document.querySelectorAll(`.chk-${callId}:checked`);
+            if (checkboxes.length === 0) return;
+
+            const call = calls.find(c => c.id === callId);
+            
+            checkboxes.forEach(chk => {
+                const unitId = chk.value;
+                const unit = units.find(u => u.id === unitId);
+                
+                if (unit && unit.status === "Available") {
+                    unit.status = "Responding";
+                    call.assignedUnits.push({
+                        id: unitId,
+                        status: "Responding"
+                    });
+                }
+            });
+
+            renderUnits();
+            renderCalls();
+        }
+
+        function unassignUnit(callId, unitId) {
+            const call = calls.find(c => c.id === callId);
+            if (!call) return;
+
+            call.assignedUnits = call.assignedUnits.filter(u => u.id !== unitId);
+            
+            if(call.command === unitId) call.command = null;
+
+            const unit = units.find(u => u.id === unitId);
+            if (unit) unit.status = "Available";
+
+            renderUnits();
+            renderCalls();
+        }
+
+        function markUnitOnScene(callId, unitId) {
+            const call = calls.find(c => c.id === callId);
+            const unitInCall = call.assignedUnits.find(u => u.id === unitId);
+            if (unitInCall) unitInCall.status = "On Scene";
+
+            const globalUnit = units.find(u => u.id === unitId);
+            if (globalUnit) globalUnit.status = "On Scene";
+
+            renderUnits();
+            renderCalls();
+        }
+
+        function clearCall(callId) {
+            const idx = calls.findIndex(c => c.id === callId);
+            if (idx === -1) return;
+            
+            calls[idx].assignedUnits.forEach(uObj => {
+                const u = units.find(un => un.id === uObj.id);
+                if (u) u.status = "Available";
+            });
+
+            calls.splice(idx, 1);
+            renderUnits(); renderCalls();
+        }
+
+        // --- RENDERERS ---
+
+        function renderUnits() {
+            const list = document.getElementById('unitList');
+            list.innerHTML = "";
+
+            units.forEach((unit, index) => {
+                const li = document.createElement('li');
+                const isEditing = unit.id === editingUnitOriginalId;
+                
+                li.className = `unit-card ${isEditing ? 'editing' : ''}`;
+                li.setAttribute('data-status', unit.status);
+                
+                const showUp = index > 0 ? '' : 'visibility:hidden';
+                const showDown = index < units.length - 1 ? '' : 'visibility:hidden';
+                const stationLabel = unit.station ? `<span class="unit-station-tag">${unit.station}</span>` : '';
+
+                // Manual Status Dropdown
+                const statusDropdown = `
+                    <select class="status-select" onchange="setManualStatus('${unit.id}', this.value)">
+                        <option value="Available" ${unit.status === 'Available' ? 'selected' : ''}>Available</option>
+                        <option value="Responding" ${unit.status === 'Responding' ? 'selected' : ''}>Responding</option>
+                        <option value="On Scene" ${unit.status === 'On Scene' ? 'selected' : ''}>On Scene</option>
+                        <option value="Out of Service" ${unit.status === 'Out of Service' ? 'selected' : ''}>Out of Service</option>
+                        <option value="Training" ${unit.status === 'Training' ? 'selected' : ''}>Training</option>
+                    </select>
+                `;
+
+                li.innerHTML = `
+                    <div class="unit-info">
+                        <div><strong>${unit.id}</strong> <span class="tag">${unit.type}</span></div>
+                        <div class="unit-name-sub">${stationLabel} ${unit.name || ''}</div>
+                        ${statusDropdown}
+                    </div>
+                    <div class="unit-actions">
+                        <div style="display:flex; flex-direction:column; gap:2px;">
+                            <button class="btn-icon" style="${showUp}" onclick="moveUnit(${index}, -1)">↑</button>
+                            <button class="btn-icon" style="${showDown}" onclick="moveUnit(${index}, 1)">↓</button>
+                        </div>
+                        <div style="width:1px; background:#555; margin:0 3px;"></div>
+                        <div style="display:flex; flex-direction:column; gap:2px;">
+                            <button class="btn-icon btn-edit" onclick="startEdit('${unit.id}')">✎</button>
+                            <button class="btn-icon btn-delete" onclick="deleteUnit('${unit.id}')">×</button>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function renderCalls() {
+            const board = document.getElementById('activeCalls');
+            board.innerHTML = "";
+            if (calls.length === 0) {
+                board.innerHTML = "<p style='color:#777; text-align:center;'>No Active Calls</p>";
+                return;
+            }
+
+            calls.forEach(call => {
+                let unitCheckboxes = "";
+                // Allow dispatching units even if they are 'Training', but usually only 'Available'
+                // For simplicity, sticking to Available logic, but could be expanded.
+                const availUnits = units.filter(u => u.status === "Available");
+                
+                if (availUnits.length === 0) {
+                    unitCheckboxes = "<div style='padding:10px; color:#aaa;'>No units available</div>";
+                } else {
+                    availUnits.forEach(u => {
+                        const stnInfo = u.station ? `(${u.station})` : '';
+                        unitCheckboxes += `
+                            <label class="unit-checkbox-label">
+                                <input type="checkbox" class="chk-${call.id}" value="${u.id}">
+                                <div>
+                                    <strong>${u.id}</strong> <span style="font-size:0.75rem; color:#aaa">${stnInfo}</span><br>
+                                    <span style='font-size:0.7em; color:#ccc'>${u.type}</span>
+                                </div>
+                            </label>
+                        `;
+                    });
+                }
+
+                let assignedHtml = "";
+                let commandOptions = `<option value="none">-- No Command --</option>`;
+
+                if(call.assignedUnits.length > 0) {
+                    assignedHtml = `<div class="assigned-units-container">`;
+                    call.assignedUnits.forEach(uObj => {
+                        const isCmd = call.command === uObj.id;
+                        commandOptions += `<option value="${uObj.id}" ${isCmd ? 'selected' : ''}>${uObj.id}</option>`;
+
+                        let actionBtn = "";
+                        let statusBadge = "";
+                        const uData = units.find(u=>u.id===uObj.id);
+                        const uName = uData?.name || '';
+                        const uStn = uData?.station || '';
+                        
+                        if (uObj.status === "Responding") {
+                            statusBadge = `<span class="badge-resp">RESPONDING</span>`;
+                            actionBtn = `<button class="btn-arrive" onclick="markUnitOnScene(${call.id}, '${uObj.id}')">Arrive</button>`;
+                        } else {
+                            statusBadge = `<span class="badge-scene">ON SCENE</span>`;
+                        }
+
+                        const cmdLabel = isCmd ? `<span style="color:#64b5f6; font-weight:bold; margin-left:5px;">(IC)</span>` : '';
+
+                        assignedHtml += `
+                            <div class="unit-status-row" title="${uName} - ${uStn}">
+                                <div>
+                                    <strong>${uObj.id}</strong>${cmdLabel}
+                                </div>
+                                <div>
+                                    ${statusBadge}
+                                    ${actionBtn}
+                                    <button class="btn-unassign" onclick="unassignUnit(${call.id}, '${uObj.id}')" title="Remove Unit">×</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    assignedHtml += `</div>`;
+                } else {
+                    assignedHtml = `<div style="font-size:0.9rem; color:#777; margin-bottom:10px;">Waiting for dispatch...</div>`;
+                }
+
+                const prioClass = `prio-${call.priority}`;
+                const prioLabel = `<span class="badge-prio badge-prio-${call.priority}">P${call.priority}</span>`;
+
+                const card = document.createElement('div');
+                card.className = `call-card ${prioClass}`;
+                card.innerHTML = `
+                    <div class="call-header">
+                        <div>
+                            <strong>CAD #${call.id} - ${call.type}</strong>
+                            ${prioLabel}
+                        </div>
+                        <span style="font-size:0.8rem; color:#aaa">${call.timestamp}</span>
+                    </div>
+                    
+                    <div class="meta-info">
+                        <div><span class="meta-label">Source:</span> ${call.origin}</div>
+                        <div><span class="meta-label">Zip:</span> ${call.postal}</div>
+                    </div>
+                    
+                    <!-- ENHANCED ADDRESS DISPLAY -->
+                    <div class="call-details">📍 ${call.address}</div>
+                    
+                    <textarea class="call-notes" placeholder="Enter Call Notes..." oninput="updateCallNotes(${call.id}, this.value)">${call.notes}</textarea>
+
+                    <div style="margin-top:10px;">
+                        ${assignedHtml}
+                    </div>
+
+                    ${call.assignedUnits.length > 0 ? `
+                    <div class="command-control">
+                        <span style="font-size:0.85rem; font-weight:bold; color:#aaa;">Scene Command:</span>
+                        <select class="command-select" onchange="setSceneCommand(${call.id}, this.value)">
+                            ${commandOptions}
+                        </select>
+                    </div>` : ''}
+                    
+                    <div class="dispatch-area">
+                        <div style="display:flex; gap:10px;">
+                            <button class="dispatch-toggle-btn" onclick="toggleDispatchMenu(${call.id})">
+                                📡 Dispatch Units...
+                            </button>
+                            <button class="btn-clear-call" onclick="clearCall(${call.id})">Clear Call</button>
+                        </div>
+                        
+                        <div id="dispatch-menu-${call.id}" class="dispatch-menu">
+                            <div style="margin-bottom:5px; font-size:0.8rem; color:#aaa;">Select units to assign:</div>
+                            <div class="unit-grid">
+                                ${unitCheckboxes}
+                            </div>
+                            <button class="btn-send-units" onclick="dispatchSelected(${call.id})">Confirm Dispatch</button>
+                        </div>
+                    </div>
+                `;
+                board.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
